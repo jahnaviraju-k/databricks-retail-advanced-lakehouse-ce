@@ -1,0 +1,179 @@
+from pyspark.sql import functions as F
+from pyspark.sql import types as T
+import random
+from datetime import datetime, timedelta
+
+spark.sql("CREATE DATABASE IF NOT EXISTS retail_advanced")
+spark.sql("USE retail_advanced")
+
+# ------------------------------
+# 1. Generate Products
+# ------------------------------
+product_categories = ["ELECTRONICS", "FURNITURE", "CLOTHING", "GROCERY"]
+brands = {
+    "ELECTRONICS": ["ZEN TECH", "CLICK PRO", "QUIET MAX", "VISIONIX"],
+    "FURNITURE": ["SEAT WELL", "LIFT UP", "HOMELUX"],
+    "CLOTHING": ["URBAN FIT", "COMFY WEAR", "SPORTY GEAR"],
+    "GROCERY": ["FRESH FARM", "EVERYDAY", "ORGANICA"]
+}
+
+num_products = 200
+products_data = []
+
+for pid in range(1, num_products + 1):
+    cat = random.choice(product_categories)
+    brand = random.choice(brands[cat])
+    products_data.append(
+        (f"P{pid:04d}", f"Product {pid}", cat, brand, "EA", "Y")
+    )
+
+products_schema = T.StructType([
+    T.StructField("product_id", T.StringType(), False),
+    T.StructField("product_name", T.StringType(), False),
+    T.StructField("category", T.StringType(), False),
+    T.StructField("brand", T.StringType(), False),
+    T.StructField("unit_of_measure", T.StringType(), False),
+    T.StructField("active_flag", T.StringType(), False),
+])
+
+df_products = spark.createDataFrame(products_data, schema=products_schema)
+df_products.write.mode("overwrite").format("delta").saveAsTable("bronze_products_raw")
+
+# ------------------------------
+# 2. Generate Stores
+# ------------------------------
+stores = [
+    ("ST01", "Downtown Flagship", "Atlanta", "GA", "US", "FLAGSHIP"),
+    ("ST02", "Mall Center", "Duluth", "GA", "US", "MALL"),
+    ("ST03", "Suburban Outlet", "Alpharetta", "GA", "US", "OUTLET"),
+    ("ST04", "City Center", "New York", "NY", "US", "FLAGSHIP"),
+    ("ST05", "West Coast Mall", "San Francisco", "CA", "US", "MALL"),
+]
+
+stores_schema = T.StructType([
+    T.StructField("store_id", T.StringType(), False),
+    T.StructField("store_name", T.StringType(), False),
+    T.StructField("city", T.StringType(), False),
+    T.StructField("state", T.StringType(), False),
+    T.StructField("country", T.StringType(), False),
+    T.StructField("store_type", T.StringType(), False),
+])
+
+df_stores = spark.createDataFrame(stores, schema=stores_schema)
+df_stores.write.mode("overwrite").format("delta").saveAsTable("bronze_stores_raw")
+
+# ------------------------------
+# 3. Generate Customers
+# ------------------------------
+num_customers = 1000
+customers_data = []
+cities = ["Atlanta", "Duluth", "Alpharetta", "New York", "San Francisco", "Dallas", "Chicago"]
+
+for cid in range(1, num_customers + 1):
+    fname = f"First{cid}"
+    lname = f"Last{cid}"
+    email = f"user{cid}@email.com"
+    city = random.choice(cities)
+    state = "GA" if city in ["Atlanta", "Duluth", "Alpharetta"] else "CA" if city == "San Francisco" else "NY"
+    country = "US"
+    join_date = datetime(2022, 1, 1) + timedelta(days=random.randint(0, 730))  # 2 years
+    customers_data.append(
+        (f"C{cid:05d}", fname, lname, email, city, state, country, join_date.strftime("%Y-%m-%d"))
+    )
+
+customers_schema = T.StructType([
+    T.StructField("customer_id", T.StringType(), False),
+    T.StructField("first_name", T.StringType(), False),
+    T.StructField("last_name", T.StringType(), False),
+    T.StructField("email", T.StringType(), False),
+    T.StructField("city", T.StringType(), False),
+    T.StructField("state", T.StringType(), False),
+    T.StructField("country", T.StringType(), False),
+    T.StructField("join_date", T.StringType(), False),
+])
+
+df_customers = spark.createDataFrame(customers_data, schema=customers_schema)
+df_customers.write.mode("overwrite").format("delta").saveAsTable("bronze_customers_raw")
+
+# ------------------------------
+# 4. Generate Orders & Order Items (2 years)
+# ------------------------------
+start_date = datetime(2023, 1, 1)
+end_date = datetime(2024, 12, 31)
+
+df_products = spark.table("bronze_products_raw")
+df_stores = spark.table("bronze_stores_raw")
+df_customers = spark.table("bronze_customers_raw")
+
+products_list = [r.product_id for r in df_products.collect()]
+stores_list = [r.store_id for r in df_stores.collect()]
+customers_list = [r.customer_id for r in df_customers.collect()]
+
+orders_data = []
+order_items_data = []
+
+order_id_counter = 1
+order_item_id_counter = 1
+
+def random_date(start, end):
+    delta = end - start
+    return start + timedelta(days=random.randint(0, delta.days), seconds=random.randint(0, 86400))
+
+num_orders = 20000
+
+for _ in range(num_orders):
+    oid = f"O{order_id_counter:06d}"
+    order_id_counter += 1
+
+    customer_id = random.choice(customers_list)
+    store_id = random.choice(stores_list)
+    order_ts = random_date(start_date, end_date)
+    num_items_in_order = random.randint(1, 5)
+
+    order_total = 0.0
+
+    for _ in range(num_items_in_order):
+        item_id = f"OI{order_item_id_counter:07d}"
+        order_item_id_counter += 1
+        product_id = random.choice(products_list)
+        quantity = random.randint(1, 3)
+        unit_price = round(random.uniform(5.0, 500.0), 2)
+        line_amount = round(quantity * unit_price, 2)
+        discount_amount = round(line_amount * random.choice([0.0, 0.05, 0.1, 0.15]), 2)
+        net_amount = round(line_amount - discount_amount, 2)
+        order_total += net_amount
+
+        order_items_data.append(
+            (item_id, oid, product_id, quantity, unit_price, discount_amount, net_amount)
+        )
+
+    orders_data.append(
+        (oid, customer_id, store_id, order_ts.strftime("%Y-%m-%d %H:%M:%S"), round(order_total, 2), "USD")
+    )
+
+orders_schema = T.StructType([
+    T.StructField("order_id", T.StringType(), False),
+    T.StructField("customer_id", T.StringType(), False),
+    T.StructField("store_id", T.StringType(), False),
+    T.StructField("order_ts", T.StringType(), False),
+    T.StructField("order_net_amount", T.DoubleType(), False),
+    T.StructField("currency", T.StringType(), False),
+])
+
+order_items_schema = T.StructType([
+    T.StructField("order_item_id", T.StringType(), False),
+    T.StructField("order_id", T.StringType(), False),
+    T.StructField("product_id", T.StringType(), False),
+    T.StructField("quantity", T.IntegerType(), False),
+    T.StructField("unit_price", T.DoubleType(), False),
+    T.StructField("discount_amount", T.DoubleType(), False),
+    T.StructField("net_amount", T.DoubleType(), False),
+])
+
+df_orders = spark.createDataFrame(orders_data, schema=orders_schema)
+df_order_items = spark.createDataFrame(order_items_data, schema=order_items_schema)
+
+df_orders.write.mode("overwrite").format("delta").saveAsTable("bronze_orders_raw")
+df_order_items.write.mode("overwrite").format("delta").saveAsTable("bronze_order_items_raw")
+
+print("Synthetic bronze tables created: bronze_products_raw, bronze_stores_raw, bronze_customers_raw, bronze_orders_raw, bronze_order_items_raw")
