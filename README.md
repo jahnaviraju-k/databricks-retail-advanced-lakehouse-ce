@@ -1,128 +1,44 @@
 # Databricks Retail Advanced Lakehouse 
 
-This project demonstrates a complete end-to-end Lakehouse architecture built entirely on Databricks Community Edition — without Unity Catalog, Workflows, or Delta Live Tables — while still following a professional Medallion Architecture (Bronze → Silver → Gold) used in real enterprise pipelines.
+This project demonstrates a complete end-to-end Lakehouse architecture built entirely on Databricks following a professional Medallion Architecture (Bronze to Silver to Gold) used in real enterprise pipelines.
 
-Project Highlights
+Project Highlights:
 
-Synthetic retail dataset generation
-Bronze → Silver → Gold Lakehouse modeling
-Delta tables for all layers
-Dimensional modeling
-Customer RFM segmentation
-Daily sales aggregation
-Basic ML demand forecasting using Spark ML
-Fully runnable on Databricks Community Edition
+1. Synthetic retail dataset generation
 
-Architecture
-databricks-retail-advanced-lakehouse-ce/
-│
-├── 01_generate_synthetic_data
-├── 02_bronze_ingestion
-├── 03_silver_transformations
-├── 04_gold_marts
-└── 05_ml_demand_forecast
+2. Bronze → Silver → Gold Lakehouse modeling
 
-Medallion Layers
+3. Delta tables for all layers
 
-# Bronze
+4. Dimensional modeling
 
-bronze_products_raw
+5. Customer RFM segmentation
 
-bronze_stores_raw
+6. Daily sales aggregation
 
-bronze_customers_raw
+7. ML demand forecasting using Spark ML
 
-bronze_orders_raw
+# Medallion Layers
 
-bronze_order_items_raw
+1. Bronze
 
-# Silver
+bronze_products_raw, bronze_stores_raw, bronze_customers_raw, bronze_orders_raw, bronze_order_items_raw
 
-silver_products
+2. Silver
 
-silver_stores
+silver_products, silver_stores, silver_customers, silver_orders, silver_order_items
 
-silver_customers
+3. Gold
 
-silver_orders
-
-silver_order_items
-
-# Gold
-
-dim_product
-
-dim_store
-
-dim_customer
-
-fact_order_lines
-
-fact_daily_sales
-
-fact_customer_rfm
-
-fact_product_forecast_example
+dim_product, dim_store, dim_customer, fact_order_lines, fact_daily_sales, fact_customer_rfm, fact_product_forecast_example
 
 # Notebooks Breakdown
-01_generate_synthetic_data
+1. 01_generate_synthetic_data: Generates synthetic retail data for Products, Stores, Customers, Orders and Order items where everything is saved directly into bronze Delta tables.
 
-Generates synthetic retail data for:
+2. 02_bronze_ingestion: Explores & validates the bronze layer for previewing data, Count records, Understand source-level structures
 
-Products
+3. 03_silver_transformations: Performs data cleansing, typing & enrichment normalizing strings, Cast types, Adding ingestion timestamps, Extracting order_date and transforms into clean, conformed silver tables.
 
-Stores
+4. 04_gold_marts: Creates analytics-ready gold layer for dim_product, dim_store, dim_customer, fact_order_lines, fact_daily_sales, fact_customer_rfm (Recency, Frequency, Monetary segmentation)
 
-Customers
-
-Orders
-
-Order items
-
-Everything is saved directly into bronze Delta tables.
-
-02_bronze_ingestion
-
-Explores & validates the bronze layer:
-
-Preview data
-
-Count records
-
-Understand source-level structures
-
-03_silver_transformations
-
-Performs data cleansing, typing & enrichment:
-
-Normalize strings
-
-Cast types
-
-Add ingestion timestamps
-
-Extract order_date
-
-Transforms into clean, conformed silver tables.
-
-04_gold_marts
-
-Creates analytics-ready gold layer:
-
-dim_product, dim_store, dim_customer
-
-fact_order_lines
-
-fact_daily_sales
-
-fact_customer_rfm (Recency, Frequency, Monetary segmentation)
-
-05_ml_demand_forecast
-
-Builds a simple demand forecasting model using Spark ML:
-
-Linear Regression
-
-Product-level daily sales forecasting
-
-Saves predictions into fact_product_forecast_example
+5. 05_ml_demand_forecast: Builds a simple demand forecasting model using Spark ML where Linear Regression and product-level daily sales forecasting saving predictions into fact_product_forecast_example
