@@ -1,0 +1,49 @@
+%sql
+CREATE OR REPLACE TABLE fact_customer_rfm AS
+WITH last_date AS (
+  SELECT MAX(order_date) AS max_date FROM workspace.retail_advanced.silver_orders
+),
+customer_orders AS (
+  SELECT
+    o.customer_id,
+    COUNT(DISTINCT o.order_id) AS frequency,
+    SUM(o.order_net_amount) AS monetary,
+    MAX(o.order_date) AS last_order_date
+  FROM workspace.retail_advanced.silver_orders o
+  GROUP BY o.customer_id
+),
+rfm_raw AS (
+  SELECT
+    c.customer_id,
+    co.frequency,
+    co.monetary,
+    DATEDIFF(l.max_date, co.last_order_date) AS recency_days
+  FROM customer_orders co
+  CROSS JOIN last_date l
+  JOIN workspace.retail_advanced.dim_customer c
+    ON c.customer_id = co.customer_id
+)
+SELECT
+  customer_id,
+  recency_days,
+  frequency,
+  monetary,
+  CASE
+    WHEN recency_days <= 30 THEN 'R1'  -- very recent
+    WHEN recency_days <= 90 THEN 'R2'
+    WHEN recency_days <= 180 THEN 'R3'
+    ELSE 'R4'
+  END AS recency_segment,
+  CASE
+    WHEN frequency >= 20 THEN 'F1'
+    WHEN frequency >= 10 THEN 'F2'
+    WHEN frequency >= 5  THEN 'F3'
+    ELSE 'F4'
+  END AS frequency_segment,
+  CASE
+    WHEN monetary >= 2000 THEN 'M1'
+    WHEN monetary >= 1000 THEN 'M2'
+    WHEN monetary >= 500  THEN 'M3'
+    ELSE 'M4'
+  END AS monetary_segment
+FROM rfm_raw;
