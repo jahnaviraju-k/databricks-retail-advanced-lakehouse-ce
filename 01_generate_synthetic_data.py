@@ -3,6 +3,9 @@ from pyspark.sql import types as T
 import random
 from datetime import datetime, timedelta
 
+# Set seed for reproducible synthetic data generation
+random.seed(42)
+
 spark.sql("CREATE DATABASE IF NOT EXISTS retail_advanced")
 spark.sql("USE retail_advanced")
 

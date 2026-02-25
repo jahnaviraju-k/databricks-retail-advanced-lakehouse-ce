@@ -1,7 +1,12 @@
 %sql
+USE retail_advanced;
+
+-- ============================================================
+-- Part 1: Customer RFM Segmentation
+-- ============================================================
 CREATE OR REPLACE TABLE fact_customer_rfm AS
 WITH last_date AS (
-  SELECT MAX(order_date) AS max_date FROM workspace.retail_advanced.silver_orders
+  SELECT MAX(order_date) AS max_date FROM silver_orders
 ),
 customer_orders AS (
   SELECT
@@ -9,7 +14,7 @@ customer_orders AS (
     COUNT(DISTINCT o.order_id) AS frequency,
     SUM(o.order_net_amount) AS monetary,
     MAX(o.order_date) AS last_order_date
-  FROM workspace.retail_advanced.silver_orders o
+  FROM silver_orders o
   GROUP BY o.customer_id
 ),
 rfm_raw AS (
@@ -20,7 +25,7 @@ rfm_raw AS (
     DATEDIFF(l.max_date, co.last_order_date) AS recency_days
   FROM customer_orders co
   CROSS JOIN last_date l
-  JOIN workspace.retail_advanced.dim_customer c
+  JOIN dim_customer c
     ON c.customer_id = co.customer_id
 )
 SELECT
